@@ -1,0 +1,99 @@
+name: 🌍 Scraping Afrique Auto - 17.8K Leads
+
+on:
+  schedule:
+    - cron: '0 6,14,22 * * *'  # 3 runs par jour
+  workflow_dispatch:
+    inputs:
+      target_leads:
+        description: 'Objectif leads par run'
+        required: false
+        default: '1500'
+      test_mode:
+        description: 'Mode test (true/false)'
+        required: false
+        default: 'false'
+
+jobs:
+  scraping-afrique:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v3
+      
+    - name: 🐍 Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        cache: 'pip'
+        
+    - name: 📦 Install Dependencies
+      run: |
+        pip install -r requirements.txt
+        sudo apt-get update
+        sudo apt-get install -y google-chrome-stable
+        
+    - name: 🎯 Run Africa Mega Scraping
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        RUN_NUMBER: ${{ github.run_number }}
+        TARGET_LEADS: ${{ github.event.inputs.target_leads || '1500' }}
+        TEST_MODE: ${{ github.event.inputs.test_mode || 'false' }}
+      run: |
+        echo "🚀 Démarrage scraping Afrique..."
+        echo "🎯 Objectif: $TARGET_LEADS leads"
+        echo "⚙️ Mode test: $TEST_MODE"
+        python scripts/scraping_afrique_mega.py
+        
+    - name: 📊 Upload Results as Artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: afrique-leads-run-${{ github.run_number }}
+        path: |
+          data/afrique_*.csv
+          data/afrique_*.json
+          data/stats_*.json
+          data/summary_*.json
+        retention-days: 90
+        
+    - name: 🏷️ Create Release with CSV
+      if: success()
+      uses: softprops/action-gh-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: afrique-v${{ github.run_number }}
+        name: "🌍 Leads Afrique #${{ github.run_number }}"
+        files: |
+          data/afrique_*.csv
+        body: |
+          ## 🌍 Scraping Afrique Automatique
+          
+          **📅 Date:** ${{ github.event.head_commit.timestamp }}
+          **🔢 Run:** #${{ github.run_number }}
+          **🎯 Cibles:** Entrepreneurs, Consultants, Managers, Créateurs, Personnalités, Entreprises, Artistes, Musiciens
+          **🌍 Pays:** Nigeria, South Africa, Kenya, Ghana, Morocco, Egypt
+          
+          ### 📊 Résultats de ce run
+          - Fichier CSV téléchargeable ci-dessous
+          - Données JSON dans les artifacts
+          - Statistiques détaillées incluses
+          
+          ### 📁 Comment utiliser
+          1. Télécharger le fichier CSV
+          2. Ouvrir avec Excel/Google Sheets
+          3. Filtrer par cible/pays selon vos besoins
+          
+          **🎯 Objectif global: 17,800 leads Afrique**
+        draft: false
+        prerelease: false
+        
+    - name: 📈 Update Progress Summary
+      if: always()
+      run: |
+        echo "📊 Run #${{ github.run_number }} terminé"
+        echo "📅 $(date)"
+        echo "🔗 Artifacts disponibles dans l'onglet Actions"
+        echo "🏷️ Release créée avec CSV téléchargeable"
