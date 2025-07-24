@@ -48,52 +48,32 @@ jobs:
         python scripts/scraping_afrique_mega.py
         
     - name: 📊 Upload Results as Artifacts
+      if: always()
       uses: actions/upload-artifact@v4
       with:
         name: afrique-leads-run-${{ github.run_number }}
         path: |
-          data/afrique_*.csv
-          data/afrique_*.json
-          data/stats_*.json
-          data/summary_*.json
+          data/
         retention-days: 90
+        if-no-files-found: warn
         
-    - name: 🏷️ Create Release with CSV
-      if: success()
-      uses: softprops/action-gh-release@v2
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: afrique-v${{ github.run_number }}
-        name: "🌍 Leads Afrique #${{ github.run_number }}"
-        files: |
-          data/afrique_*.csv
-        body: |
-          ## 🌍 Scraping Afrique Automatique
-          
-          **📅 Date:** ${{ github.event.head_commit.timestamp }}
-          **🔢 Run:** #${{ github.run_number }}
-          **🎯 Cibles:** Entrepreneurs, Consultants, Managers, Créateurs, Personnalités, Entreprises, Artistes, Musiciens
-          **🌍 Pays:** Nigeria, South Africa, Kenya, Ghana, Morocco, Egypt
-          
-          ### 📊 Résultats de ce run
-          - Fichier CSV téléchargeable ci-dessous
-          - Données JSON dans les artifacts
-          - Statistiques détaillées incluses
-          
-          ### 📁 Comment utiliser
-          1. Télécharger le fichier CSV
-          2. Ouvrir avec Excel/Google Sheets
-          3. Filtrer par cible/pays selon vos besoins
-          
-          **🎯 Objectif global: 17,800 leads Afrique**
-        draft: false
-        prerelease: false
-        
-    - name: 📈 Update Progress Summary
+    - name: 📈 Display Results Summary
       if: always()
       run: |
         echo "📊 Run #${{ github.run_number }} terminé"
         echo "📅 $(date)"
-        echo "🔗 Artifacts disponibles dans l'onglet Actions"
-        echo "🏷️ Release créée avec CSV téléchargeable"
+        echo "🔗 Résultats disponibles dans les Artifacts"
+        
+        # Afficher le contenu du dossier data
+        if [ -d "data" ]; then
+          echo "📁 Fichiers générés:"
+          ls -la data/
+          
+          # Afficher un aperçu des stats si disponible
+          if ls data/stats_*.json 1> /dev/null 2>&1; then
+            echo "📊 Aperçu des statistiques:"
+            cat data/stats_*.json | head -20
+          fi
+        else
+          echo "⚠️ Aucun fichier généré dans le dossier data"
+        fi
