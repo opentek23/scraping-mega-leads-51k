@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-🌍 SCRAPING AFRIQUE MEGA - VERSION CORRIGÉE
-Script simplifié et fonctionnel pour GitHub Actions
+🌍 SCRAPING AFRIQUE MEGA - VERSION SANS PANDAS
+Script ultra-léger pour éviter les conflits de dépendances
 """
 
 import requests
 from bs4 import BeautifulSoup
-import pandas as pd
+import json
+import csv
 import time
 import random
-import json
 import os
 from datetime import datetime, timezone
 import urllib.parse
@@ -27,7 +27,7 @@ class AfriqueScrapingMega:
             'Connection': 'keep-alive',
         })
         
-        # Configuration simplifiée
+        # Configuration
         self.target_leads = int(os.environ.get('TARGET_LEADS', '100'))
         self.test_mode = os.environ.get('TEST_MODE', 'true').lower() == 'true'
         self.run_number = os.environ.get('RUN_NUMBER', '000')
@@ -36,7 +36,7 @@ class AfriqueScrapingMega:
         print(f"🧪 Test mode: {self.test_mode}")
         print(f"🔢 Run number: {self.run_number}")
         
-        # Requêtes de recherche prêtes
+        # Requêtes optimisées Afrique
         self.search_queries = [
             'CEO startup Nigeria site:linkedin.com',
             'founder Kenya business site:linkedin.com',
@@ -47,21 +47,28 @@ class AfriqueScrapingMega:
             'musician Ghana site:twitter.com',
             'content creator "South Africa" site:instagram.com',
             'influencer Lagos Nigeria site:instagram.com',
-            'tech entrepreneur Kenya site:linkedin.com'
+            'tech entrepreneur Kenya site:linkedin.com',
+            'startup CEO Morocco site:linkedin.com',
+            'business owner Egypt site:linkedin.com'
         ]
     
-    def scrape_google_search(self, query, max_results=50):
-        """Scrape Google avec gestion d'erreur simple"""
+    def scrape_google_search(self, query, max_results=30):
+        """Scrape Google simplifié"""
         results = []
         
         try:
-            print(f"  🔍 Recherche: {query[:50]}...")
+            print(f"  🔍 {query[:60]}...")
             
-            # Construction URL
+            # URL de recherche
             search_url = f"https://www.google.com/search?q={urllib.parse.quote(query)}&num=10"
             
             # Requête
-            response = self.session.get(search_url, timeout=10)
+            response = self.session.get(search_url, timeout=15)
+            
+            if response.status_code == 429:
+                print(f"    ⚠️ Rate limit, pause...")
+                time.sleep(30)
+                return results
             
             if response.status_code != 200:
                 print(f"    ⚠️ Status {response.status_code}")
@@ -70,7 +77,7 @@ class AfriqueScrapingMega:
             # Parse HTML
             soup = BeautifulSoup(response.content, 'html.parser')
             
-            # Extraction liens
+            # Extraction des liens
             for link in soup.find_all('a', href=True):
                 href = link.get('href', '')
                 
@@ -79,98 +86,113 @@ class AfriqueScrapingMega:
                     href = href.split('/url?q=')[1].split('&')[0]
                     href = urllib.parse.unquote(href)
                 
-                # Filtrer liens pertinents
-                if any(site in href for site in ['linkedin.com/in/', 'instagram.com/', 'twitter.com/']):
+                # Filtrer les plateformes pertinentes
+                relevant_platforms = [
+                    'linkedin.com/in/', 'instagram.com/', 'twitter.com/',
+                    'crunchbase.com/', 'angel.co/'
+                ]
+                
+                if any(platform in href for platform in relevant_platforms):
                     link_text = link.get_text(strip=True)
                     
-                    result = {
-                        'url': href,
-                        'text': link_text[:200],
-                        'query': query,
-                        'found_at': datetime.now(timezone.utc).isoformat()
-                    }
-                    results.append(result)
-                    
-                    if len(results) >= max_results:
-                        break
+                    # Éviter les liens trop courts ou vides
+                    if len(link_text) > 5:
+                        result = {
+                            'url': href,
+                            'text': link_text[:300],
+                            'query': query,
+                            'found_at': datetime.now(timezone.utc).isoformat()
+                        }
+                        results.append(result)
+                        
+                        if len(results) >= max_results:
+                            break
             
-            print(f"    ✅ Trouvé {len(results)} liens")
+            print(f"    ✅ {len(results)} liens trouvés")
             
             # Délai anti-détection
-            time.sleep(random.uniform(3, 7))
+            time.sleep(random.uniform(4, 8))
             
         except Exception as e:
-            print(f"    ❌ Erreur: {e}")
+            print(f"    ❌ Erreur: {str(e)[:100]}")
         
         return results
     
-    def determine_platform(self, url):
-        """Détermine la plateforme"""
+    def classify_prospect(self, query, url, text):
+        """Classification automatique des prospects"""
+        query_lower = query.lower()
+        text_lower = text.lower()
+        
+        # Déterminer la plateforme
         if 'linkedin.com' in url:
-            return 'linkedin'
+            platform = 'linkedin'
         elif 'instagram.com' in url:
-            return 'instagram'
+            platform = 'instagram'
         elif 'twitter.com' in url:
-            return 'twitter'
+            platform = 'twitter'
+        elif 'crunchbase.com' in url:
+            platform = 'crunchbase'
         else:
-            return 'other'
-    
-    def determine_target_type(self, query, text):
-        """Détermine le type de cible"""
-        query_lower = query.lower()
-        text_lower = text.lower()
+            platform = 'other'
         
+        # Déterminer le type de cible
         if any(word in query_lower for word in ['ceo', 'founder', 'entrepreneur']):
-            return 'entrepreneur'
+            target_type = 'entrepreneur'
         elif any(word in query_lower for word in ['consultant', 'advisor']):
-            return 'consultant'
+            target_type = 'consultant'
         elif any(word in query_lower for word in ['musician', 'artist', 'afrobeats']):
-            return 'musicien'
+            target_type = 'musicien'
         elif any(word in query_lower for word in ['creator', 'influencer']):
-            return 'createur'
+            target_type = 'createur'
         else:
-            return 'other'
-    
-    def determine_country(self, query, text):
-        """Détermine le pays"""
-        query_lower = query.lower()
-        text_lower = text.lower()
+            target_type = 'other'
         
+        # Déterminer le pays
         if any(word in query_lower for word in ['nigeria', 'lagos']):
-            return 'nigeria'
+            country = 'nigeria'
         elif 'kenya' in query_lower:
-            return 'kenya'
+            country = 'kenya'
         elif 'ghana' in query_lower:
-            return 'ghana'
+            country = 'ghana'
         elif 'south africa' in query_lower:
-            return 'south_africa'
+            country = 'south_africa'
+        elif 'morocco' in query_lower:
+            country = 'morocco'
+        elif 'egypt' in query_lower:
+            country = 'egypt'
         else:
-            return 'africa_other'
+            country = 'africa_other'
+        
+        return platform, target_type, country
     
     def scrape_all_queries(self):
-        """Scrape toutes les requêtes"""
-        print("🌍 DÉMARRAGE SCRAPING AFRIQUE")
+        """Scraping complet"""
+        print("\n🌍 DÉMARRAGE SCRAPING AFRIQUE")
         print("=" * 50)
         
         all_prospects = []
         
-        # Limiter les requêtes en mode test
-        queries_to_use = self.search_queries[:3] if self.test_mode else self.search_queries
+        # Limiter en mode test
+        queries_to_use = self.search_queries[:4] if self.test_mode else self.search_queries
         
         for i, query in enumerate(queries_to_use):
             print(f"\n🎯 Query {i+1}/{len(queries_to_use)}")
             
             # Scraping
-            results = self.scrape_google_search(query, max_results=20 if self.test_mode else 50)
+            results = self.scrape_google_search(query, max_results=25 if self.test_mode else 40)
             
-            # Traitement des résultats
+            # Traitement
             for result in results:
+                platform, target_type, country = self.classify_prospect(
+                    query, result['url'], result['text']
+                )
+                
                 prospect = {
                     'url': result['url'],
                     'text': result['text'],
-                    'platform': self.determine_platform(result['url']),
-                    'target_type': self.determine_target_type(query, result['text']),
-                    'country': self.determine_country(query, result['text']),
+                    'platform': platform,
+                    'target_type': target_type,
+                    'country': country,
                     'source_query': query,
                     'found_at': result['found_at'],
                     'region': 'afrique',
@@ -178,34 +200,65 @@ class AfriqueScrapingMega:
                 }
                 all_prospects.append(prospect)
             
-            # Arrêter si objectif atteint
+            # Vérifier objectif
             if len(all_prospects) >= self.target_leads:
                 print(f"🎯 Objectif {self.target_leads} atteint!")
                 break
             
             # Délai entre requêtes
-            time.sleep(random.uniform(5, 10))
+            time.sleep(random.uniform(8, 15))
         
         # Suppression des doublons
-        unique_prospects = []
-        seen_urls = set()
-        
-        for prospect in all_prospects:
-            if prospect['url'] not in seen_urls:
-                seen_urls.add(prospect['url'])
-                unique_prospects.append(prospect)
-        
-        removed = len(all_prospects) - len(unique_prospects)
-        if removed > 0:
-            print(f"🧹 Supprimé {removed} doublons")
+        unique_prospects = self.remove_duplicates(all_prospects)
         
         print(f"\n🎉 SCRAPING TERMINÉ!")
-        print(f"📊 Total prospects uniques: {len(unique_prospects)}")
+        print(f"📊 Total: {len(all_prospects)} → {len(unique_prospects)} uniques")
         
         return unique_prospects
     
+    def remove_duplicates(self, prospects):
+        """Supprime les doublons par URL"""
+        seen_urls = set()
+        unique = []
+        
+        for prospect in prospects:
+            url = prospect['url']
+            if url not in seen_urls:
+                seen_urls.add(url)
+                unique.append(prospect)
+        
+        removed = len(prospects) - len(unique)
+        if removed > 0:
+            print(f"🧹 {removed} doublons supprimés")
+        
+        return unique
+    
+    def calculate_stats(self, prospects):
+        """Calcule les statistiques"""
+        stats = {
+            'total': len(prospects),
+            'by_platform': {},
+            'by_target_type': {},
+            'by_country': {}
+        }
+        
+        for prospect in prospects:
+            # Stats par plateforme
+            platform = prospect['platform']
+            stats['by_platform'][platform] = stats['by_platform'].get(platform, 0) + 1
+            
+            # Stats par type
+            target_type = prospect['target_type']
+            stats['by_target_type'][target_type] = stats['by_target_type'].get(target_type, 0) + 1
+            
+            # Stats par pays
+            country = prospect['country']
+            stats['by_country'][country] = stats['by_country'].get(country, 0) + 1
+        
+        return stats
+    
     def save_results(self, prospects):
-        """Sauvegarde simplifiée"""
+        """Sauvegarde en CSV et JSON"""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
         # Créer dossier
@@ -214,41 +267,48 @@ class AfriqueScrapingMega:
         # Noms de fichiers
         csv_file = f"data/afrique_prospects_run{self.run_number}_{timestamp}.csv"
         json_file = f"data/afrique_prospects_run{self.run_number}_{timestamp}.json"
-        summary_file = f"data/summary_afrique_run{self.run_number}_{timestamp}.json"
+        stats_file = f"data/stats_afrique_run{self.run_number}_{timestamp}.json"
         
         try:
             if prospects:
-                # DataFrame
-                df = pd.DataFrame(prospects)
+                # Sauvegarde CSV
+                with open(csv_file, 'w', newline='', encoding='utf-8') as csvfile:
+                    fieldnames = [
+                        'url', 'text', 'platform', 'target_type', 'country',
+                        'source_query', 'found_at', 'region', 'run_number'
+                    ]
+                    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                    writer.writeheader()
+                    writer.writerows(prospects)
                 
-                # CSV
-                df.to_csv(csv_file, index=False, encoding='utf-8')
                 print(f"💾 CSV sauvé: {csv_file}")
                 
-                # JSON
-                df.to_json(json_file, orient='records', indent=2)
+                # Sauvegarde JSON
+                with open(json_file, 'w', encoding='utf-8') as f:
+                    json.dump(prospects, f, indent=2, ensure_ascii=False)
+                
                 print(f"💾 JSON sauvé: {json_file}")
                 
                 # Statistiques
-                stats = {
-                    'total_prospects': len(prospects),
-                    'by_platform': df['platform'].value_counts().to_dict(),
-                    'by_target_type': df['target_type'].value_counts().to_dict(),
-                    'by_country': df['country'].value_counts().to_dict(),
+                stats = self.calculate_stats(prospects)
+                stats.update({
                     'run_number': self.run_number,
                     'timestamp': timestamp,
-                    'test_mode': self.test_mode
-                }
+                    'test_mode': self.test_mode,
+                    'target_leads': self.target_leads
+                })
                 
-                with open(summary_file, 'w', encoding='utf-8') as f:
+                with open(stats_file, 'w', encoding='utf-8') as f:
                     json.dump(stats, f, indent=2, ensure_ascii=False)
                 
-                print(f"📊 Stats sauvées: {summary_file}")
-                print(f"\n📈 RÉSULTATS:")
-                print(f"  - Total: {len(prospects)} prospects")
-                print(f"  - Platforms: {stats['by_platform']}")
-                print(f"  - Types: {stats['by_target_type']}")
-                print(f"  - Pays: {stats['by_country']}")
+                print(f"📊 Stats sauvées: {stats_file}")
+                
+                # Affichage résultats
+                print(f"\n📈 RÉSULTATS DÉTAILLÉS:")
+                print(f"  📊 Total prospects: {stats['total']}")
+                print(f"  🌐 Plateformes: {stats['by_platform']}")
+                print(f"  🎯 Types: {stats['by_target_type']}")
+                print(f"  🌍 Pays: {stats['by_country']}")
                 
                 return True
             else:
@@ -260,8 +320,8 @@ class AfriqueScrapingMega:
             return False
 
 def main():
-    """Fonction principale"""
-    print("🚀 GITHUB ACTIONS - SCRAPING AFRIQUE MEGA")
+    """Fonction principale pour GitHub Actions"""
+    print("🚀 SCRAPING AFRIQUE - VERSION OPTIMISÉE")
     print("=" * 60)
     
     try:
@@ -274,10 +334,12 @@ def main():
         # Sauvegarder
         success = scraper.save_results(prospects)
         
-        if success:
-            print(f"\n🎉 SUCCÈS! {len(prospects)} prospects trouvés")
+        if success and prospects:
+            print(f"\n🎉 SUCCÈS TOTAL!")
+            print(f"📊 {len(prospects)} prospects africains collectés")
+            print(f"📁 Fichiers CSV et JSON prêts à télécharger")
         else:
-            print(f"\n⚠️ ÉCHEC ou aucun résultat")
+            print(f"\n⚠️ Terminé avec peu ou pas de résultats")
         
         return success
         
