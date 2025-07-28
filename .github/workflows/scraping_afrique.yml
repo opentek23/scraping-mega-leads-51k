@@ -13,6 +13,10 @@ on:
         description: 'Mode test (true/false)'
         required: false
         default: 'false'
+      send_emails:
+        description: 'Envoyer emails (true/false)'
+        required: false
+        default: 'true'
 
 jobs:
   scraping-afrique:
@@ -47,6 +51,18 @@ jobs:
         echo "⚙️ Mode test: $TEST_MODE"
         python scripts/scraping_afrique_mega.py
         
+    - name: 📧 Send Automated Emails
+      if: always() && github.event.inputs.send_emails != 'false'
+      env:
+        EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+        SMTP_SERVER: ${{ secrets.SMTP_SERVER || 'smtp.gmail.com' }}
+        SMTP_PORT: ${{ secrets.SMTP_PORT || '587' }}
+        SENDER_EMAIL: ${{ secrets.SENDER_EMAIL || 'contact@neolinks.me' }}
+      run: |
+        echo "📧 Démarrage automation email..."
+        echo "📨 Expéditeur: $SENDER_EMAIL"
+        python scripts/email_automation.py
+        
     - name: 📊 Upload Results as Artifacts
       if: always()
       uses: actions/upload-artifact@v4
@@ -73,6 +89,12 @@ jobs:
           if ls data/stats_*.json 1> /dev/null 2>&1; then
             echo "📊 Aperçu des statistiques:"
             cat data/stats_*.json | head -20
+          fi
+          
+          # Afficher rapport email si disponible
+          if ls data/email_report_*.json 1> /dev/null 2>&1; then
+            echo "📧 Rapport email:"
+            cat data/email_report_*.json | head -10
           fi
         else
           echo "⚠️ Aucun fichier généré dans le dossier data"
