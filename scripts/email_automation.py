@@ -19,7 +19,7 @@ class NeolinksEmailSafe:
     def __init__(self):
         # Configuration email
         self.sender_email = os.environ.get('SENDER_EMAIL', 'contact@neolinks.me')
-        self.sender_password = os.environ.get('Neolinks@202507', '')
+self.sender_password = os.environ.get('EMAIL_PASSWORD', '')
         self.sender_name = "Saïd Ali Omar"
         
         # Configuration SMTP Hostinger
