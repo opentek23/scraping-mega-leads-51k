@@ -19,7 +19,7 @@ class NeolinksEmailSafe:
     def __init__(self):
         # Configuration email
         self.sender_email = os.environ.get('SENDER_EMAIL', 'contact@neolinks.me')
-self.sender_password = os.environ.get('EMAIL_PASSWORD', '')
+        self.sender_password = os.environ.get('EMAIL_PASSWORD', '')
         self.sender_name = "Saïd Ali Omar"
         
         # Configuration SMTP Hostinger
@@ -30,7 +30,7 @@ self.sender_password = os.environ.get('EMAIL_PASSWORD', '')
         # Fichier historique des emails envoyés
         self.sent_emails_file = "data/sent_emails_history.json"
         
-        # Configuration langues par pays (identique au précédent)
+        # Configuration langues par pays
         self.country_languages = {
             # Pays francophones
             'senegal': 'french', 'cote_divoire': 'french', 'burkina_faso': 'french',
@@ -134,7 +134,7 @@ https://neolinks.me/""",
                 with open(self.sent_emails_file, 'r', encoding='utf-8') as f:
                     history = json.load(f)
                 print(f"📚 Historique chargé: {len(history)} emails déjà envoyés")
-                return set(history)  # Utiliser un set pour performance
+                return set(history)
             else:
                 print("📚 Aucun historique trouvé - premier envoi")
                 return set()
@@ -145,7 +145,6 @@ https://neolinks.me/""",
     def save_sent_emails_history(self, sent_emails):
         """Sauvegarde l'historique des emails envoyés"""
         try:
-            # Créer le dossier si nécessaire
             os.makedirs('data', exist_ok=True)
             
             with open(self.sent_emails_file, 'w', encoding='utf-8') as f:
@@ -186,7 +185,6 @@ https://neolinks.me/""",
     
     def load_prospects_with_dedup(self, csv_file, sent_emails_history):
         """Charge prospects en filtrant les doublons"""
-        prospects = []
         new_prospects = []
         duplicates_found = 0
         language_stats = {'french': 0, 'english': 0}
@@ -201,13 +199,11 @@ https://neolinks.me/""",
                     country = row.get('country', '').strip()
                     
                     if email and '@' in email and name:
-                        # Vérifier si déjà envoyé
                         if email in sent_emails_history:
                             duplicates_found += 1
                             print(f"  🔄 Déjà envoyé: {name} ({email})")
                             continue
                         
-                        # Nouveau prospect
                         language = self.get_language_for_country(country)
                         language_stats[language] += 1
                         
@@ -230,11 +226,11 @@ https://neolinks.me/""",
                 print(f"🇫🇷 Nouveaux français: {language_stats['french']}")
                 print(f"🇬🇧 Nouveaux anglais: {language_stats['english']}")
                 
-                return new_prospects
+                return new_prospects, duplicates_found
                 
         except Exception as e:
             print(f"❌ Erreur lecture CSV: {e}")
-            return []
+            return [], 0
     
     def personalize_subject(self, prospect):
         """Personnalise l'objet selon le type et la langue"""
@@ -280,12 +276,10 @@ https://neolinks.me/""",
             
             # Connexion SMTP Hostinger
             if self.smtp_use_ssl and self.smtp_port == 465:
-                # SSL direct (port 465)
                 with smtplib.SMTP_SSL(self.smtp_server, self.smtp_port) as server:
                     server.login(self.sender_email, self.sender_password)
                     server.send_message(msg)
             else:
-                # STARTTLS (port 587)
                 with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
                     server.starttls()
                     server.login(self.sender_email, self.sender_password)
@@ -392,13 +386,12 @@ https://neolinks.me/""",
             return False
         
         # 3. Charger prospects en filtrant les doublons
-        prospects = self.load_prospects_with_dedup(csv_file, sent_emails_history)
-        duplicates_avoided = len(sent_emails_history)
+        prospects, duplicates_avoided = self.load_prospects_with_dedup(csv_file, sent_emails_history)
         
         if not prospects:
             print("🔄 Tous les prospects ont déjà reçu un email")
             print(f"📊 {duplicates_avoided} doublons évités")
-            return True  # Succès car protection fonctionne
+            return True
         
         # 4. Vérifier configuration email
         if not self.sender_password:
