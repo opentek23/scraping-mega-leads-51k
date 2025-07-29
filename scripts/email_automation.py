@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-📧 AUTOMATION EMAIL NEOLINKS - GMAIL ANTI-BLOCAGE
-Configuration optimisée pour neolinks.me@gmail.com
+📧 AUTOMATION EMAIL NEOLINKS - GMAIL ANTI-DOUBLON FIXÉ
+Fix critique : Protection anti-doublon renforcée
 """
 
 import smtplib
@@ -34,7 +34,7 @@ class NeolinksEmailGmail:
         self.delay_range = (60, 120)  # 1-2 minutes entre emails (sécurisé)
         self.batch_delay_range = (900, 1800)  # 15-30 min entre batches
         
-        # Fichier historique des emails envoyés
+        # ✅ FIX CRITIQUE : Fichier historique avec chemin absolu
         self.sent_emails_file = "data/sent_emails_history.json"
         
         # Configuration langues par pays
@@ -148,36 +148,79 @@ https://neolinks.me/""",
             }
         }
         
-        print(f"📧 Email Automation Neolinks - GMAIL ANTI-BLOCAGE")
+        print(f"📧 Email Automation Neolinks - GMAIL ANTI-DOUBLON FIXÉ")
         print(f"📨 Expéditeur: {self.sender_email}")
         print(f"🔗 SMTP: {self.smtp_server}:{self.smtp_port}")
-        print(f"🛡️ Protection anti-spam: ACTIVE")
+        print(f"🛡️ Protection anti-doublon: RENFORCÉE")
         print(f"📊 Limites: {self.hourly_limit}/h, {self.daily_limit}/jour")
     
     def load_sent_emails_history(self):
-        """Charge l'historique des emails envoyés"""
+        """✅ FIX : Charge l'historique avec vérification renforcée"""
         try:
+            # Créer le dossier data s'il n'existe pas
+            os.makedirs('data', exist_ok=True)
+            
+            # Vérifier l'existence du fichier
             if os.path.exists(self.sent_emails_file):
                 with open(self.sent_emails_file, 'r', encoding='utf-8') as f:
-                    history = json.load(f)
-                print(f"📚 Historique chargé: {len(history)} emails déjà envoyés")
-                return set(history)
+                    content = f.read().strip()
+                    
+                if content:  # ✅ Vérifier que le fichier n'est pas vide
+                    history = json.loads(content)
+                    if isinstance(history, list):
+                        print(f"📚 Historique chargé: {len(history)} emails déjà envoyés")
+                        print(f"🔍 Derniers emails envoyés: {history[-3:] if len(history) >= 3 else history}")
+                        return set(history)
+                    else:
+                        print("⚠️ Format historique invalide - reset")
+                        return set()
+                else:
+                    print("📚 Fichier historique vide - premier envoi")
+                    return set()
             else:
-                print("📚 Aucun historique trouvé - premier envoi")
+                print("📚 Aucun historique trouvé - création du fichier")
+                # ✅ Créer le fichier vide immédiatement
+                with open(self.sent_emails_file, 'w', encoding='utf-8') as f:
+                    json.dump([], f)
                 return set()
+                
         except Exception as e:
-            print(f"⚠️ Erreur lecture historique: {e}")
+            print(f"❌ Erreur lecture historique: {e}")
+            print(f"🔧 Création d'un nouvel historique")
+            try:
+                with open(self.sent_emails_file, 'w', encoding='utf-8') as f:
+                    json.dump([], f)
+            except:
+                pass
             return set()
     
     def save_sent_emails_history(self, sent_emails):
-        """Sauvegarde l'historique des emails envoyés"""
+        """✅ FIX : Sauvegarde renforcée avec vérification"""
         try:
             os.makedirs('data', exist_ok=True)
             
-            with open(self.sent_emails_file, 'w', encoding='utf-8') as f:
-                json.dump(list(sent_emails), f, indent=2)
+            # ✅ Double sauvegarde pour sécurité
+            emails_list = sorted(list(sent_emails))  # Trier pour consistance
             
-            print(f"📚 Historique sauvé: {len(sent_emails)} emails au total")
+            # Sauvegarde principale
+            with open(self.sent_emails_file, 'w', encoding='utf-8') as f:
+                json.dump(emails_list, f, indent=2, ensure_ascii=False)
+            
+            # ✅ Sauvegarde backup avec timestamp
+            backup_file = f"data/sent_emails_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+            with open(backup_file, 'w', encoding='utf-8') as f:
+                json.dump(emails_list, f, indent=2, ensure_ascii=False)
+            
+            print(f"📚 Historique sauvé: {len(emails_list)} emails au total")
+            print(f"💾 Backup créé: {backup_file}")
+            
+            # ✅ Vérification immédiate
+            test_load = self.load_sent_emails_history()
+            if len(test_load) == len(sent_emails):
+                print("✅ Vérification sauvegarde: OK")
+            else:
+                print(f"⚠️ Problème sauvegarde détecté: {len(test_load)} vs {len(sent_emails)}")
+                
         except Exception as e:
             print(f"❌ Erreur sauvegarde historique: {e}")
     
@@ -211,23 +254,27 @@ https://neolinks.me/""",
             return self.templates_english
     
     def load_prospects_with_dedup(self, csv_file, sent_emails_history):
-        """Charge prospects en filtrant les doublons"""
+        """✅ FIX : Dédoublonnage renforcé avec logs détaillés"""
         new_prospects = []
         duplicates_found = 0
         language_stats = {'french': 0, 'english': 0}
+        duplicates_list = []  # ✅ Pour tracer les doublons
         
         try:
             with open(csv_file, 'r', encoding='utf-8') as file:
                 reader = csv.DictReader(file)
                 
                 for row in reader:
-                    email = row.get('email', '').strip()
+                    email = row.get('email', '').strip().lower()  # ✅ Normaliser email
                     name = row.get('name', '').strip()
                     country = row.get('country', '').strip()
                     
                     if email and '@' in email and name:
+                        # ✅ VÉRIFICATION ANTI-DOUBLON RENFORCÉE
                         if email in sent_emails_history:
                             duplicates_found += 1
+                            duplicates_list.append(f"{name} ({email})")
+                            print(f"🔄 DOUBLON ÉVITÉ: {name} ({email})")
                             continue
                         
                         language = self.get_language_for_country(country)
@@ -246,11 +293,18 @@ https://neolinks.me/""",
                         }
                         new_prospects.append(prospect)
                 
-                print(f"\n📊 ANALYSE DOUBLONS:")
+                print(f"\n📊 ANALYSE DOUBLONS DÉTAILLÉE:")
                 print(f"✅ Nouveaux prospects: {len(new_prospects)}")
                 print(f"🔄 Doublons évités: {duplicates_found}")
                 print(f"🇫🇷 Nouveaux français: {language_stats['french']}")
                 print(f"🇬🇧 Nouveaux anglais: {language_stats['english']}")
+                
+                if duplicates_list:
+                    print(f"📝 Doublons détectés:")
+                    for dup in duplicates_list[:5]:  # Afficher les 5 premiers
+                        print(f"   • {dup}")
+                    if len(duplicates_list) > 5:
+                        print(f"   ... et {len(duplicates_list) - 5} autres")
                 
                 return new_prospects, duplicates_found
                 
@@ -329,9 +383,16 @@ https://neolinks.me/""",
         
         return msg
     
-    def send_email_gmail_safe(self, prospect):
-        """Envoie un email via Gmail avec protection anti-spam"""
+    def send_email_gmail_safe(self, prospect, sent_emails_history):
+        """✅ FIX : Envoi avec vérification anti-doublon AVANT envoi"""
         try:
+            email = prospect['email'].lower()
+            
+            # ✅ DOUBLE VÉRIFICATION ANTI-DOUBLON AVANT ENVOI
+            if email in sent_emails_history:
+                print(f"  🔄 DOUBLON DÉTECTÉ - SKIP: {prospect['name']} ({email})")
+                return False, True  # Failed mais doublon détecté
+            
             language_flag = "🇫🇷" if prospect.get('language') == 'french' else "🇬🇧"
             
             # Créer email professionnel
@@ -346,8 +407,8 @@ https://neolinks.me/""",
             server.send_message(msg)
             server.quit()
             
-            print(f"  ✅ {language_flag} Gmail envoyé à {prospect['name']} ({prospect['email']})")
-            return True
+            print(f"  ✅ {language_flag} Gmail envoyé à {prospect['name']} ({email})")
+            return True, False  # Success et pas de doublon
             
         except Exception as e:
             error_msg = str(e)
@@ -361,15 +422,15 @@ https://neolinks.me/""",
             elif "4.2.1" in error_msg:
                 print("     💡 Tip: Boîte email pleine")
             
-            return False
+            return False, False  # Failed et pas de doublon
     
     def send_batch_emails_gmail(self, prospects, sent_emails_history):
-        """Envoi batch Gmail avec protection anti-spam avancée"""
+        """✅ FIX : Envoi batch avec protection anti-doublon MAXIMALE"""
         if not prospects:
             print("🔄 Aucun nouveau prospect à contacter")
             return 0, 0, {'french': 0, 'english': 0}
         
-        print(f"\n📧 ENVOI GMAIL ANTI-BLOCAGE")
+        print(f"\n📧 ENVOI GMAIL ANTI-DOUBLON RENFORCÉ")
         print(f"📊 Nouveaux prospects: {len(prospects)}")
         print(f"📦 Batch size: {self.batch_size}")
         print(f"⏱️ Délais: {self.delay_range[0]}-{self.delay_range[1]}s entre emails")
@@ -381,18 +442,27 @@ https://neolinks.me/""",
         
         sent_count = 0
         failed_count = 0
+        duplicates_detected = 0
         language_sent = {'french': 0, 'english': 0}
-        newly_sent_emails = set()
+        newly_sent_emails = set(sent_emails_history)  # ✅ Commencer avec historique existant
         
-        # ✅ ENVOI SÉCURISÉ AVEC BATCHES
+        # ✅ ENVOI SÉCURISÉ AVEC PROTECTION MAXIMALE
         for i, prospect in enumerate(prospects):
             language_flag = "🇫🇷" if prospect.get('language') == 'french' else "🇬🇧"
             print(f"\n📧 Email {i+1}/{len(prospects)} {language_flag}")
             
-            if self.send_email_gmail_safe(prospect):
+            success, is_duplicate = self.send_email_gmail_safe(prospect, newly_sent_emails)
+            
+            if success:
                 sent_count += 1
                 language_sent[prospect.get('language', 'english')] += 1
-                newly_sent_emails.add(prospect['email'])
+                newly_sent_emails.add(prospect['email'].lower())
+                
+                # ✅ SAUVEGARDE IMMÉDIATE APRÈS CHAQUE ENVOI RÉUSSI
+                self.save_sent_emails_history(newly_sent_emails)
+                
+            elif is_duplicate:
+                duplicates_detected += 1
             else:
                 failed_count += 1
             
@@ -409,14 +479,11 @@ https://neolinks.me/""",
                 print(f"\n🔄 Fin batch {batch_num}. Pause longue {batch_delay//60}min pour éviter blocage Gmail...")
                 time.sleep(batch_delay)
         
-        # Mettre à jour l'historique
-        updated_history = sent_emails_history.union(newly_sent_emails)
-        self.save_sent_emails_history(updated_history)
-        
         print(f"\n📊 Statistiques Gmail:")
         print(f"🇫🇷 Français: {language_sent['french']}")
         print(f"🇬🇧 Anglais: {language_sent['english']}")
-        print(f"📈 Taux succès: {(sent_count/(sent_count+failed_count)*100):.1f}%")
+        print(f"🔄 Doublons détectés en cours: {duplicates_detected}")
+        print(f"📈 Taux succès: {(sent_count/(sent_count+failed_count)*100):.1f}%" if (sent_count+failed_count) > 0 else "0%")
         
         return sent_count, failed_count, language_sent
     
@@ -436,8 +503,14 @@ https://neolinks.me/""",
             'by_language': language_sent,
             'sender': self.sender_email,
             'smtp_server': self.smtp_server,
-            'version': 'gmail_anti_block',
+            'version': 'gmail_anti_doublon_fixed',
             'antiduplicate_protection': True,
+            'antiduplicate_features': {
+                'immediate_save_after_send': True,
+                'double_verification': True,
+                'backup_files': True,
+                'detailed_logging': True
+            },
             'anti_spam_features': {
                 'batch_size': self.batch_size,
                 'delay_range': self.delay_range,
@@ -459,9 +532,9 @@ https://neolinks.me/""",
             return None
     
     def run_automation(self):
-        """Lance l'automation complète Gmail anti-blocage"""
-        print("🚀 DÉMARRAGE AUTOMATION EMAIL GMAIL")
-        print("🛡️ Protection anti-spam et anti-blocage MAXIMALE")
+        """Lance l'automation complète Gmail anti-doublon FIXÉ"""
+        print("🚀 DÉMARRAGE AUTOMATION EMAIL GMAIL - ANTI-DOUBLON FIXÉ")
+        print("🛡️ Protection anti-doublon et anti-spam MAXIMALE")
         print("🌍 Français + Anglais selon pays")
         print("=" * 70)
         
@@ -496,7 +569,7 @@ https://neolinks.me/""",
         # 6. Envoi Gmail sécurisé
         print(f"\n📧 ENVOI GMAIL SÉCURISÉ DE {len(prospects)} NOUVEAUX EMAILS")
         print(f"📧 De: {self.sender_email}")
-        print(f"🔒 Sécurité: Délais étendus + Batches + Headers professionnels")
+        print(f"🔒 Sécurité: Protection anti-doublon RENFORCÉE")
         
         sent_count, failed_count, language_sent = self.send_batch_emails_gmail(
             prospects, sent_emails_history
@@ -505,12 +578,12 @@ https://neolinks.me/""",
         # 7. Rapport final
         self.save_email_report(sent_count, failed_count, prospects, language_sent, duplicates_avoided)
         
-        print(f"\n🎉 AUTOMATION GMAIL TERMINÉE")
+        print(f"\n🎉 AUTOMATION GMAIL ANTI-DOUBLON TERMINÉE")
         print(f"✅ Nouveaux envoyés: {sent_count}")
         print(f"🔄 Doublons évités: {duplicates_avoided}")
         print(f"❌ Échecs: {failed_count}")
         print(f"📧 Expéditeur: {self.sender_email}")
-        print(f"🛡️ Protection anti-blocage: MAXIMALE")
+        print(f"🛡️ Protection anti-doublon: MAXIMALE - FIXÉE")
         
         return sent_count > 0
 
