@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-📧 AUTOMATION EMAIL NEOLINKS MULTILINGUE + ANTI-DOUBLON
-Évite d'envoyer plusieurs fois à la même personne
+📧 AUTOMATION EMAIL NEOLINKS OPTIMISÉE - VERSION RAPIDE
+Délais réduits pour éviter timeout GitHub Actions
 """
 
 import smtplib
@@ -15,7 +15,7 @@ from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 import glob
 
-class NeolinksEmailSafe:
+class NeolinksEmailFast:
     def __init__(self):
         # Configuration email
         self.sender_email = os.environ.get('SENDER_EMAIL', 'contact@neolinks.me')
@@ -123,9 +123,9 @@ https://neolinks.me/""",
             }
         }
         
-        print(f"📧 Email Automation Neolinks avec Anti-Doublon")
+        print(f"📧 Email Automation Neolinks RAPIDE")
         print(f"📨 Expéditeur: {self.sender_email}")
-        print(f"🛡️ Protection contre doublons activée")
+        print(f"⚡ Version optimisée pour GitHub Actions")
     
     def load_sent_emails_history(self):
         """Charge l'historique des emails envoyés"""
@@ -292,58 +292,87 @@ https://neolinks.me/""",
             print(f"  ❌ Erreur envoi à {prospect.get('name', 'Inconnu')}: {e}")
             return False
     
-    def send_batch_emails_safe(self, prospects, sent_emails_history, batch_size=10, delay_range=(30, 60)):
-        """Envoie emails par batch avec mise à jour de l'historique"""
+    def send_batch_emails_fast(self, prospects, sent_emails_history):
+        """Version RAPIDE - Délais réduits pour GitHub Actions"""
         if not prospects:
             print("🔄 Aucun nouveau prospect à contacter")
             return 0, 0, {'french': 0, 'english': 0}
         
-        print(f"\n📧 DÉMARRAGE ENVOI SÉCURISÉ")
+        print(f"\n📧 ENVOI RAPIDE OPTIMISÉ")
         print(f"📊 Nouveaux prospects: {len(prospects)}")
-        print(f"📦 Taille batch: {batch_size}")
+        print(f"⚡ Délais réduits pour éviter timeout")
         
         sent_count = 0
         failed_count = 0
         language_sent = {'french': 0, 'english': 0}
         newly_sent_emails = set()
         
-        for i, prospect in enumerate(prospects):
-            language_flag = "🇫🇷" if prospect.get('language') == 'french' else "🇬🇧"
-            print(f"\n📧 Email {i+1}/{len(prospects)} {language_flag}")
-            
-            if self.send_email(prospect):
-                sent_count += 1
-                language_sent[prospect.get('language', 'english')] += 1
-                newly_sent_emails.add(prospect['email'])
+        # Maintenir connexion SMTP ouverte pour performance
+        try:
+            if self.smtp_use_ssl and self.smtp_port == 465:
+                server = smtplib.SMTP_SSL(self.smtp_server, self.smtp_port)
             else:
-                failed_count += 1
+                server = smtplib.SMTP(self.smtp_server, self.smtp_port)
+                server.starttls()
             
-            # Délai anti-spam
-            if i < len(prospects) - 1:
-                delay = random.randint(delay_range[0], delay_range[1])
-                print(f"  ⏱️ Pause {delay}s...")
-                time.sleep(delay)
+            server.login(self.sender_email, self.sender_password)
+            print("🔐 Connexion SMTP établie")
             
-            # Pause entre batches
-            if (i + 1) % batch_size == 0 and i < len(prospects) - 1:
-                batch_delay = random.randint(300, 600)
-                print(f"\n🔄 Fin batch {(i+1)//batch_size}. Pause {batch_delay//60}min...")
-                time.sleep(batch_delay)
+            for i, prospect in enumerate(prospects):
+                language_flag = "🇫🇷" if prospect.get('language') == 'french' else "🇬🇧"
+                print(f"📧 Email {i+1}/{len(prospects)} {language_flag}")
+                
+                try:
+                    subject = self.personalize_subject(prospect)
+                    content = self.personalize_email(prospect)
+                    recipient_email = prospect['email']
+                    
+                    msg = MIMEMultipart()
+                    msg['From'] = f"{self.sender_name} <{self.sender_email}>"
+                    msg['To'] = recipient_email
+                    msg['Subject'] = subject
+                    msg.attach(MIMEText(content, 'plain', 'utf-8'))
+                    
+                    server.send_message(msg)
+                    
+                    sent_count += 1
+                    language_sent[prospect.get('language', 'english')] += 1
+                    newly_sent_emails.add(prospect['email'])
+                    
+                    print(f"  ✅ {language_flag} Envoyé à {prospect['name']}")
+                    
+                    # Délai minimal pour éviter spam (2-5 secondes seulement)
+                    if i < len(prospects) - 1:
+                        delay = random.randint(2, 5)
+                        time.sleep(delay)
+                    
+                except Exception as e:
+                    failed_count += 1
+                    print(f"  ❌ Erreur: {prospect.get('name', 'Inconnu')}: {e}")
+                    continue
+            
+            server.quit()
+            print("🔓 Connexion SMTP fermée")
+            
+        except Exception as e:
+            print(f"❌ Erreur connexion SMTP: {e}")
+            return 0, len(prospects), {'french': 0, 'english': 0}
         
         # Mettre à jour l'historique
         updated_history = sent_emails_history.union(newly_sent_emails)
         self.save_sent_emails_history(updated_history)
         
-        print(f"\n📊 Statistiques envoi:")
+        print(f"\n📊 Statistiques envoi rapide:")
         print(f"🇫🇷 Français: {language_sent['french']}")
         print(f"🇬🇧 Anglais: {language_sent['english']}")
+        print(f"⚡ Temps total: ~{len(prospects) * 3} secondes")
         
         return sent_count, failed_count, language_sent
     
     def save_email_report(self, sent_count, failed_count, prospects, language_sent, duplicates_avoided):
         """Sauvegarde rapport d'envoi avec info doublons"""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        report_file = f"data/email_report_safe_{timestamp}.json"
+        report_file = f"data/email_report_fast_{timestamp}.json"
         
         report = {
             'timestamp': datetime.now().isoformat(),
@@ -355,6 +384,7 @@ https://neolinks.me/""",
             'success_rate': round((sent_count / len(prospects)) * 100, 2) if prospects else 0,
             'by_language': language_sent,
             'sender': self.sender_email,
+            'version': 'fast_optimized',
             'antiduplicate_protection': True
         }
         
@@ -362,7 +392,7 @@ https://neolinks.me/""",
             with open(report_file, 'w', encoding='utf-8') as f:
                 json.dump(report, f, indent=2, ensure_ascii=False)
             
-            print(f"\n📊 Rapport sécurisé sauvé: {report_file}")
+            print(f"\n📊 Rapport rapide sauvé: {report_file}")
             return report_file
             
         except Exception as e:
@@ -370,9 +400,9 @@ https://neolinks.me/""",
             return None
     
     def run_automation(self):
-        """Lance l'automation complète avec protection anti-doublon"""
-        print("🚀 DÉMARRAGE AUTOMATION EMAIL SÉCURISÉE")
-        print("🛡️ Protection anti-doublon activée")
+        """Lance l'automation complète RAPIDE"""
+        print("🚀 DÉMARRAGE AUTOMATION EMAIL RAPIDE")
+        print("⚡ Version optimisée GitHub Actions")
         print("🌍 Français + Anglais selon pays")
         print("=" * 70)
         
@@ -409,26 +439,26 @@ https://neolinks.me/""",
             print(f"\n🎭 {len(prospects)} NOUVEAUX emails seraient envoyés")
             return True
         
-        # 5. Envoi réel avec protection
-        print(f"\n📧 ENVOI SÉCURISÉ DE {len(prospects)} NOUVEAUX EMAILS")
-        sent_count, failed_count, language_sent = self.send_batch_emails_safe(
+        # 5. Envoi rapide optimisé
+        print(f"\n📧 ENVOI RAPIDE DE {len(prospects)} NOUVEAUX EMAILS")
+        sent_count, failed_count, language_sent = self.send_batch_emails_fast(
             prospects, sent_emails_history
         )
         
         # 6. Rapport final
         self.save_email_report(sent_count, failed_count, prospects, language_sent, duplicates_avoided)
         
-        print(f"\n🎉 AUTOMATION SÉCURISÉE TERMINÉE")
+        print(f"\n🎉 AUTOMATION RAPIDE TERMINÉE")
         print(f"✅ Nouveaux envoyés: {sent_count}")
         print(f"🔄 Doublons évités: {duplicates_avoided}")
         print(f"❌ Échecs: {failed_count}")
-        print(f"🛡️ Protection anti-doublon: ACTIVE")
+        print(f"⚡ Performance: OPTIMISÉE")
         
         return sent_count > 0
 
 def main():
     """Fonction principale pour GitHub Actions"""
-    automation = NeolinksEmailSafe()
+    automation = NeolinksEmailFast()
     success = automation.run_automation()
     
     if success:
