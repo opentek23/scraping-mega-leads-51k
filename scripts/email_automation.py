@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-📧 AUTOMATION EMAIL NEOLINKS OPTIMISÉE - VERSION RAPIDE
-Délais réduits pour éviter timeout GitHub Actions
+📧 AUTOMATION EMAIL NEOLINKS - CONFIGURATION HOSTINGER FIXÉE
 """
 
 import smtplib
@@ -15,17 +14,17 @@ from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 import glob
 
-class NeolinksEmailFast:
+class NeolinksEmailHostinger:
     def __init__(self):
         # Configuration email
         self.sender_email = os.environ.get('SENDER_EMAIL', 'contact@neolinks.me')
         self.sender_password = os.environ.get('EMAIL_PASSWORD', '')
         self.sender_name = "Saïd Ali Omar"
         
-        # Configuration SMTP Hostinger
-        self.smtp_server = os.environ.get('SMTP_SERVER', 'smtp.hostinger.com')
-        self.smtp_port = int(os.environ.get('SMTP_PORT', '465'))
-        self.smtp_use_ssl = os.environ.get('SMTP_USE_SSL', 'true').lower() == 'true'
+        # ✅ CONFIGURATION HOSTINGER FORCÉE
+        self.smtp_server = 'smtp.hostinger.com'  # FORCÉ HOSTINGER
+        self.smtp_port = 465  # PORT SSL HOSTINGER
+        self.smtp_use_ssl = True  # SSL DIRECT
         
         # Fichier historique des emails envoyés
         self.sent_emails_file = "data/sent_emails_history.json"
@@ -123,9 +122,10 @@ https://neolinks.me/""",
             }
         }
         
-        print(f"📧 Email Automation Neolinks RAPIDE")
+        print(f"📧 Email Automation Neolinks - HOSTINGER")
         print(f"📨 Expéditeur: {self.sender_email}")
-        print(f"⚡ Version optimisée pour GitHub Actions")
+        print(f"🔗 SMTP: {self.smtp_server}:{self.smtp_port}")
+        print(f"🔐 SSL: {self.smtp_use_ssl}")
     
     def load_sent_emails_history(self):
         """Charge l'historique des emails envoyés"""
@@ -259,6 +259,22 @@ https://neolinks.me/""",
         
         return templates['email_content'].format(name=first_name)
     
+    def test_smtp_connection(self):
+        """Test de connexion SMTP Hostinger"""
+        try:
+            print("🔍 Test connexion SMTP Hostinger...")
+            print(f"📡 Serveur: {self.smtp_server}:{self.smtp_port}")
+            print(f"📧 Email: {self.sender_email}")
+            
+            with smtplib.SMTP_SSL(self.smtp_server, self.smtp_port) as server:
+                server.login(self.sender_email, self.sender_password)
+                print("✅ Connexion SMTP réussie !")
+                return True
+                
+        except Exception as e:
+            print(f"❌ Erreur connexion SMTP: {e}")
+            return False
+    
     def send_email(self, prospect):
         """Envoie un email à un prospect dans sa langue"""
         try:
@@ -274,16 +290,10 @@ https://neolinks.me/""",
             
             msg.attach(MIMEText(content, 'plain', 'utf-8'))
             
-            # Connexion SMTP Hostinger
-            if self.smtp_use_ssl and self.smtp_port == 465:
-                with smtplib.SMTP_SSL(self.smtp_server, self.smtp_port) as server:
-                    server.login(self.sender_email, self.sender_password)
-                    server.send_message(msg)
-            else:
-                with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
-                    server.starttls()
-                    server.login(self.sender_email, self.sender_password)
-                    server.send_message(msg)
+            # ✅ CONNEXION HOSTINGER SSL DIRECTE
+            with smtplib.SMTP_SSL(self.smtp_server, self.smtp_port) as server:
+                server.login(self.sender_email, self.sender_password)
+                server.send_message(msg)
             
             print(f"  ✅ {language_flag} Email envoyé à {prospect['name']} ({recipient_email})")
             return True
@@ -292,87 +302,57 @@ https://neolinks.me/""",
             print(f"  ❌ Erreur envoi à {prospect.get('name', 'Inconnu')}: {e}")
             return False
     
-    def send_batch_emails_fast(self, prospects, sent_emails_history):
-        """Version RAPIDE - Délais réduits pour GitHub Actions"""
+    def send_batch_emails_hostinger(self, prospects, sent_emails_history):
+        """Envoi batch optimisé Hostinger"""
         if not prospects:
             print("🔄 Aucun nouveau prospect à contacter")
             return 0, 0, {'french': 0, 'english': 0}
         
-        print(f"\n📧 ENVOI RAPIDE OPTIMISÉ")
+        print(f"\n📧 ENVOI VIA HOSTINGER")
         print(f"📊 Nouveaux prospects: {len(prospects)}")
-        print(f"⚡ Délais réduits pour éviter timeout")
+        print(f"🔗 Serveur: {self.smtp_server}:{self.smtp_port}")
+        
+        # Test connexion avant envoi
+        if not self.test_smtp_connection():
+            print("❌ Impossible de se connecter à Hostinger")
+            return 0, len(prospects), {'french': 0, 'english': 0}
         
         sent_count = 0
         failed_count = 0
         language_sent = {'french': 0, 'english': 0}
         newly_sent_emails = set()
         
-        # Maintenir connexion SMTP ouverte pour performance
-        try:
-            if self.smtp_use_ssl and self.smtp_port == 465:
-                server = smtplib.SMTP_SSL(self.smtp_server, self.smtp_port)
+        for i, prospect in enumerate(prospects):
+            language_flag = "🇫🇷" if prospect.get('language') == 'french' else "🇬🇧"
+            print(f"\n📧 Email {i+1}/{len(prospects)} {language_flag}")
+            
+            if self.send_email(prospect):
+                sent_count += 1
+                language_sent[prospect.get('language', 'english')] += 1
+                newly_sent_emails.add(prospect['email'])
             else:
-                server = smtplib.SMTP(self.smtp_server, self.smtp_port)
-                server.starttls()
+                failed_count += 1
             
-            server.login(self.sender_email, self.sender_password)
-            print("🔐 Connexion SMTP établie")
-            
-            for i, prospect in enumerate(prospects):
-                language_flag = "🇫🇷" if prospect.get('language') == 'french' else "🇬🇧"
-                print(f"📧 Email {i+1}/{len(prospects)} {language_flag}")
-                
-                try:
-                    subject = self.personalize_subject(prospect)
-                    content = self.personalize_email(prospect)
-                    recipient_email = prospect['email']
-                    
-                    msg = MIMEMultipart()
-                    msg['From'] = f"{self.sender_name} <{self.sender_email}>"
-                    msg['To'] = recipient_email
-                    msg['Subject'] = subject
-                    msg.attach(MIMEText(content, 'plain', 'utf-8'))
-                    
-                    server.send_message(msg)
-                    
-                    sent_count += 1
-                    language_sent[prospect.get('language', 'english')] += 1
-                    newly_sent_emails.add(prospect['email'])
-                    
-                    print(f"  ✅ {language_flag} Envoyé à {prospect['name']}")
-                    
-                    # Délai minimal pour éviter spam (2-5 secondes seulement)
-                    if i < len(prospects) - 1:
-                        delay = random.randint(2, 5)
-                        time.sleep(delay)
-                    
-                except Exception as e:
-                    failed_count += 1
-                    print(f"  ❌ Erreur: {prospect.get('name', 'Inconnu')}: {e}")
-                    continue
-            
-            server.quit()
-            print("🔓 Connexion SMTP fermée")
-            
-        except Exception as e:
-            print(f"❌ Erreur connexion SMTP: {e}")
-            return 0, len(prospects), {'french': 0, 'english': 0}
+            # Délai minimal anti-spam
+            if i < len(prospects) - 1:
+                delay = random.randint(3, 7)
+                print(f"  ⏱️ Pause {delay}s...")
+                time.sleep(delay)
         
         # Mettre à jour l'historique
         updated_history = sent_emails_history.union(newly_sent_emails)
         self.save_sent_emails_history(updated_history)
         
-        print(f"\n📊 Statistiques envoi rapide:")
+        print(f"\n📊 Statistiques Hostinger:")
         print(f"🇫🇷 Français: {language_sent['french']}")
         print(f"🇬🇧 Anglais: {language_sent['english']}")
-        print(f"⚡ Temps total: ~{len(prospects) * 3} secondes")
         
         return sent_count, failed_count, language_sent
     
     def save_email_report(self, sent_count, failed_count, prospects, language_sent, duplicates_avoided):
         """Sauvegarde rapport d'envoi avec info doublons"""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        report_file = f"data/email_report_fast_{timestamp}.json"
+        report_file = f"data/email_report_hostinger_{timestamp}.json"
         
         report = {
             'timestamp': datetime.now().isoformat(),
@@ -384,7 +364,9 @@ https://neolinks.me/""",
             'success_rate': round((sent_count / len(prospects)) * 100, 2) if prospects else 0,
             'by_language': language_sent,
             'sender': self.sender_email,
-            'version': 'fast_optimized',
+            'smtp_server': self.smtp_server,
+            'smtp_port': self.smtp_port,
+            'version': 'hostinger_fixed',
             'antiduplicate_protection': True
         }
         
@@ -392,7 +374,7 @@ https://neolinks.me/""",
             with open(report_file, 'w', encoding='utf-8') as f:
                 json.dump(report, f, indent=2, ensure_ascii=False)
             
-            print(f"\n📊 Rapport rapide sauvé: {report_file}")
+            print(f"\n📊 Rapport Hostinger sauvé: {report_file}")
             return report_file
             
         except Exception as e:
@@ -400,9 +382,9 @@ https://neolinks.me/""",
             return None
     
     def run_automation(self):
-        """Lance l'automation complète RAPIDE"""
-        print("🚀 DÉMARRAGE AUTOMATION EMAIL RAPIDE")
-        print("⚡ Version optimisée GitHub Actions")
+        """Lance l'automation complète Hostinger"""
+        print("🚀 DÉMARRAGE AUTOMATION EMAIL HOSTINGER")
+        print("🔗 Configuration SMTP forcée sur Hostinger")
         print("🌍 Français + Anglais selon pays")
         print("=" * 70)
         
@@ -439,26 +421,26 @@ https://neolinks.me/""",
             print(f"\n🎭 {len(prospects)} NOUVEAUX emails seraient envoyés")
             return True
         
-        # 5. Envoi rapide optimisé
-        print(f"\n📧 ENVOI RAPIDE DE {len(prospects)} NOUVEAUX EMAILS")
-        sent_count, failed_count, language_sent = self.send_batch_emails_fast(
+        # 5. Envoi via Hostinger
+        print(f"\n📧 ENVOI HOSTINGER DE {len(prospects)} NOUVEAUX EMAILS")
+        sent_count, failed_count, language_sent = self.send_batch_emails_hostinger(
             prospects, sent_emails_history
         )
         
         # 6. Rapport final
         self.save_email_report(sent_count, failed_count, prospects, language_sent, duplicates_avoided)
         
-        print(f"\n🎉 AUTOMATION RAPIDE TERMINÉE")
+        print(f"\n🎉 AUTOMATION HOSTINGER TERMINÉE")
         print(f"✅ Nouveaux envoyés: {sent_count}")
         print(f"🔄 Doublons évités: {duplicates_avoided}")
         print(f"❌ Échecs: {failed_count}")
-        print(f"⚡ Performance: OPTIMISÉE")
+        print(f"🔗 Serveur: Hostinger SMTP")
         
         return sent_count > 0
 
 def main():
     """Fonction principale pour GitHub Actions"""
-    automation = NeolinksEmailFast()
+    automation = NeolinksEmailHostinger()
     success = automation.run_automation()
     
     if success:
