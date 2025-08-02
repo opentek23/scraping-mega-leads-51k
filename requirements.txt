@@ -1,3 +1,29 @@
-requests==2.31.0
-beautifulsoup4==4.12.2
-lxml==4.9.3
+# Requirements optimisés pour scraping seul (sans email)
+# Version allégée sans dépendances email
+
+# Core scraping
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+
+# Data handling
+pandas>=2.0.0
+numpy>=1.24.0
+
+# HTTP/Web
+urllib3>=2.0.0
+certifi>=2023.0.0
+
+# Date/Time
+python-dateutil>=2.8.0
+
+# JSON/CSV (built-in Python modules suffisent mais on peut inclure pour compatibilité)
+# csv - built-in
+# json - built-in
+
+# Optional: Pour scraping avancé si nécessaire
+# selenium>=4.15.0  # Commenté car pas nécessaire pour GitHub API
+# webdriver-manager>=4.0.0  # Commenté
+
+# Pas de dépendances email (smtplib est built-in mais on l'utilise pas)
+# Pas de dépendances SMTP externes
