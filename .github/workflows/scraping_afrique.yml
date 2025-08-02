@@ -1,27 +1,32 @@
-name: 🌍 Scraping Afrique Auto - 17.8K Leads
-
+name: 🌍 Scraping Afrique Optimisé - SANS EMAIL
 on:
   schedule:
-    - cron: '0 6,14,22 * * *'  # 3 runs par jour
+    - cron: '0 6,14,22 * * *'  # 3 runs par jour à 6h, 14h, 22h UTC
   workflow_dispatch:
     inputs:
       target_leads:
         description: 'Objectif leads par run'
         required: false
-        default: '1500'
+        default: '100'
+        type: string
       test_mode:
         description: 'Mode test (true/false)'
         required: false
         default: 'false'
-      send_emails:
-        description: 'Envoyer emails (true/false)'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+      countries_limit:
+        description: 'Nombre de pays à scraper'
         required: false
-        default: 'true'
+        default: '6'
+        type: string
 
 jobs:
   scraping-afrique:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 90  # Réduit pour éviter timeouts
     
     steps:
     - name: 📥 Checkout Repository
@@ -30,72 +35,125 @@ jobs:
     - name: 🐍 Setup Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.9'
+        python-version: '3.11'
         cache: 'pip'
         
     - name: 📦 Install Dependencies
       run: |
-        pip install -r requirements.txt
-        sudo apt-get update
-        sudo apt-get install -y google-chrome-stable
+        pip install --upgrade pip
+        pip install requests beautifulsoup4 lxml selenium
+        pip install pandas numpy python-dateutil
         
-    - name: 🎯 Run Africa Mega Scraping
+    - name: 🌍 Scraping Africa Mega Leads
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         RUN_NUMBER: ${{ github.run_number }}
-        TARGET_LEADS: ${{ github.event.inputs.target_leads || '1500' }}
+        TARGET_LEADS: ${{ github.event.inputs.target_leads || '100' }}
         TEST_MODE: ${{ github.event.inputs.test_mode || 'false' }}
+        COUNTRIES_LIMIT: ${{ github.event.inputs.countries_limit || '6' }}
       run: |
-        echo "🚀 Démarrage scraping Afrique..."
+        echo "🚀 SCRAPING AFRIQUE SANS EMAIL - RUN #$RUN_NUMBER"
         echo "🎯 Objectif: $TARGET_LEADS leads"
         echo "⚙️ Mode test: $TEST_MODE"
+        echo "🌍 Pays limités: $COUNTRIES_LIMIT"
+        echo "📅 Démarrage: $(date)"
+        
+        # Créer le dossier data
+        mkdir -p data
+        
+        # Lancer le scraping seul
         python scripts/scraping_afrique_mega.py
         
-    - name: 📧 Send Automated Emails
-      if: always() && github.event.inputs.send_emails != 'false'
-      env:
-        EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
-        SMTP_SERVER: ${{ secrets.SMTP_SERVER || 'smtp.gmail.com' }}
-        SMTP_PORT: ${{ secrets.SMTP_PORT || '587' }}
-        SENDER_EMAIL: ${{ secrets.SENDER_EMAIL || 'contact@neolinks.me' }}
-      run: |
-        echo "📧 Démarrage automation email..."
-        echo "📨 Expéditeur: $SENDER_EMAIL"
-        python scripts/email_automation.py
+        echo "✅ Scraping terminé à $(date)"
         
-    - name: 📊 Upload Results as Artifacts
-      if: always()
+    - name: 📊 Vérification des résultats
+      run: |
+        echo "📊 VÉRIFICATION RÉSULTATS - RUN #${{ github.run_number }}"
+        
+        if [ -d "data" ]; then
+          echo "📁 Contenu du dossier data:"
+          ls -la data/
+          
+          # Compter les fichiers CSV générés
+          csv_count=$(find data/ -name "*.csv" | wc -l)
+          echo "📄 Fichiers CSV: $csv_count"
+          
+          # Afficher les statistiques si disponibles
+          if ls data/stats_*.json 1> /dev/null 2>&1; then
+            echo ""
+            echo "📊 STATISTIQUES DÉTAILLÉES:"
+            latest_stats=$(ls -t data/stats_*.json | head -1)
+            cat "$latest_stats"
+          fi
+          
+          # Afficher aperçu du CSV principal
+          if ls data/afrique_8_cibles_*.csv 1> /dev/null 2>&1; then
+            echo ""
+            echo "📈 APERÇU DONNÉES CSV:"
+            latest_csv=$(ls -t data/afrique_8_cibles_*.csv | head -1)
+            echo "Fichier: $latest_csv"
+            echo "Lignes totales: $(wc -l < "$latest_csv")"
+            echo "Colonnes: $(head -1 "$latest_csv")"
+            echo ""
+            echo "Premiers prospects:"
+            head -5 "$latest_csv"
+          fi
+        else
+          echo "❌ Aucun dossier data créé"
+          exit 1
+        fi
+        
+    - name: 🔍 Validation qualité des données
+      run: |
+        echo "🔍 VALIDATION QUALITÉ DONNÉES"
+        
+        # Vérifier la qualité des emails
+        if ls data/afrique_8_cibles_*.csv 1> /dev/null 2>&1; then
+          latest_csv=$(ls -t data/afrique_8_cibles_*.csv | head -1)
+          
+          # Compter emails valides
+          valid_emails=$(tail -n +2 "$latest_csv" | cut -d',' -f3 | grep -E "^[^,]*@[^,]*\.[^,]*$" | wc -l)
+          total_lines=$(tail -n +2 "$latest_csv" | wc -l)
+          
+          echo "📧 Emails valides: $valid_emails / $total_lines"
+          
+          # Vérifier répartition par pays
+          echo ""
+          echo "🌍 RÉPARTITION PAR PAYS:"
+          tail -n +2 "$latest_csv" | cut -d',' -f9 | sort | uniq -c | sort -nr
+          
+          # Vérifier répartition par type
+          echo ""
+          echo "🎯 RÉPARTITION PAR TYPE:"
+          tail -n +2 "$latest_csv" | cut -d',' -f1 | sort | uniq -c | sort -nr
+        fi
+        
+    - name: 📦 Upload Results as Artifacts
       uses: actions/upload-artifact@v4
       with:
         name: afrique-leads-run-${{ github.run_number }}
         path: |
-          data/
-        retention-days: 90
+          data/*.csv
+          data/*.json
+        retention-days: 30
         if-no-files-found: warn
         
-    - name: 📈 Display Results Summary
+    - name: 🎉 Résumé Final
       if: always()
       run: |
-        echo "📊 Run #${{ github.run_number }} terminé"
-        echo "📅 $(date)"
-        echo "🔗 Résultats disponibles dans les Artifacts"
+        echo ""
+        echo "🎉 =========================================="
+        echo "🌍 SCRAPING AFRIQUE TERMINÉ - RUN #${{ github.run_number }}"
+        echo "🎉 =========================================="
+        echo "📅 Date fin: $(date)"
+        echo "🚫 Automation email: DÉSACTIVÉE"
+        echo "✅ Scraping seul: ACTIVÉ"
+        echo "📊 Données disponibles dans les Artifacts"
+        echo ""
         
-        # Afficher le contenu du dossier data
-        if [ -d "data" ]; then
-          echo "📁 Fichiers générés:"
-          ls -la data/
-          
-          # Afficher un aperçu des stats si disponible
-          if ls data/stats_*.json 1> /dev/null 2>&1; then
-            echo "📊 Aperçu des statistiques:"
-            cat data/stats_*.json | head -20
-          fi
-          
-          # Afficher rapport email si disponible
-          if ls data/email_report_*.json 1> /dev/null 2>&1; then
-            echo "📧 Rapport email:"
-            cat data/email_report_*.json | head -10
-          fi
+        # Status final
+        if [ -f "data/afrique_8_cibles_run${{ github.run_number }}_"*.csv ]; then
+          echo "✅ SUCCÈS: Fichiers CSV générés"
         else
-          echo "⚠️ Aucun fichier généré dans le dossier data"
+          echo "❌ ÉCHEC: Aucun CSV généré"
         fi
